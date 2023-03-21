@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rm_task</title>
+    <script src='https://www.naodao.com/public/experiment/libs/jspsych-7/jspsych.js'></script>
+    <script src='https://www.naodao.com/public/experiment/libs/extension/naodao-2021-12.js'></script>
+    <script src='https://www.naodao.com/public/experiment/libs/axios.min.js'></script>
+
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-html-keyboard-response.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-video-keyboard-response.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-survey-text.js"></script>
+    <script src="https://karenyu717.github.io/rm_static/plugin-browser-check.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-preload.js"></script>
+    <script src="https://www.naodao.com/public/experiment/libs/plugin/plugin-fullscreen.js"></script>
+    <link rel='stylesheet' href='https://www.naodao.com/public/experiment/libs/jspsych-7/css/jspsych.css'>
+</head>
+
+<body>
+    <script>
+
+        //expriment begins-----------------------------------------------------------------------------------------------
+        //between group
+        var v_duration = 10;//6 8 10
+        var v_grabFrame = 20;//20 40
+
+        var n_trials = 40;
+
+        var totalFrame = v_duration * 60;
+        var v_groupRatio = v_duration / 8;
+
+        const jsPsych = initJsPsych({
+            show_preload_progress_bar: false,
+            show_progress_bar: true,
+            message_progress_bar: '完成进度',
+            auto_update_progress_bar: false,
+            extensions: [{ type: Naodao }],
+            on_finish: function () {
+                jsPsych.data.get()
+            }
+        });
+        var timeline = [];
+        jsPsych.data.addProperties({ videoDuration: v_duration, grabFrame: v_grabFrame, });
+
+        //prepare
+        var directionType = [];
+        for (var i = 0; i < 40; i++) {
+            if (i < 20) {
+                directionType.push('vh');
+            }
+            else {
+                directionType.push('hv');
+            }
+        }
+
+        var choicesType = [];
+        for (var i = 0; i < 40; i++) {
+            if (i < 10) {
+                choicesType.push('bf');
+            }
+            else if (i < 20) {
+                choicesType.push('fb');
+            }
+            else if (i < 30) {
+                choicesType.push('bf');
+            }
+            else {
+                choicesType.push('fb');
+            }
+        }
+
+        //6s共360f；8s共460f；10s共600f
+        var stopFrameType = [];
+        for (var i = 0; i < 8; i++) {
+            stopFrameType.push(120 * v_groupRatio, 180 * v_groupRatio, 240 * v_groupRatio, 300 * v_groupRatio, 360 * v_groupRatio);
+        }
+
+        var stimulusType = [directionType, choicesType, stopFrameType];
+
+        stimulusType.Shuffle = function () {
+
+            var totalTrial = this[0].length;
+            var totalType = this.length;
+
+            for (var j2 = totalTrial - 1; j2 > 0; j2--) {
+                var index = Math.floor(Math.random() * j2);
+                for (var j1 = 0; j1 < totalType; j1++) {
+                    [this[j1][j2], this[j1][index]] = [this[j1][index], this[j1][j2]];
+                }
+            }
+            return this;
+        }
+
+        //不出现4个及以上重复的方向、位置、结束点
+        var repeatCount1 = 1;
+        var repeatCount2 = 1;
+        var repeatCount3 = 1;
+        var success = 0;
+        while (!success) {
+            success = 1;
+            for (var p = 1; p < directionType.length; p++) {
+                //方向限制
+                if (directionType[p] == directionType[p - 1]) {
+                    repeatCount1 += 1;
+                }
+                else {
+                    repeatCount1 = 1;
+                }
+
+                //选项位置限制
+                if (choicesType[p] == choicesType[p - 1]) {
+                    repeatCount2 += 1;
+                }
+                else {
+                    repeatCount2 = 1;
+                }
+
+                //结束点限制
+                if (stopFrameType[p] == stopFrameType[p - 1]) {
+                    repeatCount3 += 1;
+                }
+                else {
+                    repeatCount3 = 1;
+                }
+
+                if (repeatCount1 == 4 || repeatCount2 == 4 || repeatCount3 == 4) {
+                    success = 0;
+                    stimulusType.Shuffle();
+                    break;
+                }
+            }
+        }
+
+        //stimulusType = [directionType, choicesType, stopFrameType];
+        var test_stimuli = [];
+        for (var trialNo = 0; trialNo < stimulusType[0].length; trialNo++) {
+            var backwardFrame = padding(stimulusType[2][trialNo] - v_grabFrame);
+            var forwardFrame = padding(stimulusType[2][trialNo] + v_grabFrame);
+            var t_startTime = Math.random() * v_groupRatio;
+
+            var maskNum = jsPsych.randomization.sampleWithoutReplacement([1, 2, 3, 4, 5, 6, 7], 1)[0];
+
+            switch (stimulusType[1][trialNo]) {
+                case 'bf':
+                    var trial_stimuli = [{
+                        videoSrc: `https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_${stimulusType[0][trialNo]}/${v_duration}_${stimulusType[0][trialNo]}.mp4`,
+                        leftPicSrc: `https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_${stimulusType[0][trialNo]}/${v_duration}_${stimulusType[0][trialNo]}${backwardFrame}.jpg`,
+                        rightPicSrc: `https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_${stimulusType[0][trialNo]}/${v_duration}_${stimulusType[0][trialNo]}${forwardFrame}.jpg`,
+                        maskPicSrc: `https://karenyu717.github.io/rm_static/stimuli1/masks/${maskNum}_mask.jpg`,
+                        data: { direction: stimulusType[0][trialNo], choicesPos: stimulusType[1][trialNo], stopFrame: stimulusType[2][trialNo], startTime: t_startTime, trialIndex_real: trialNo + 1 }
+                    }]
+                    break;
+                case 'fb':
+                    var trial_stimuli = [{
+                        videoSrc: `https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_${stimulusType[0][trialNo]}/${v_duration}_${stimulusType[0][trialNo]}.mp4`,
+                        leftPicSrc: `https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_${stimulusType[0][trialNo]}/${v_duration}_${stimulusType[0][trialNo]}${forwardFrame}.jpg`,
+                        rightPicSrc: `https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_${stimulusType[0][trialNo]}/${v_duration}_${stimulusType[0][trialNo]}${backwardFrame}.jpg`,
+                        maskPicSrc: `https://karenyu717.github.io/rm_static/stimuli1/masks/${maskNum}_mask.jpg`,
+                        data: { direction: stimulusType[0][trialNo], choicesPos: stimulusType[1][trialNo], stopFrame: stimulusType[2][trialNo], startTime: t_startTime, trialIndex_real: trialNo + 1 }
+                    }]
+                    break;
+            }
+            test_stimuli.push(trial_stimuli[0]);
+        }
+        //
+        test_stimuli = test_stimuli.slice(0, n_trials);
+
+        // preload
+        var preload = {
+            type: jsPsychPreload,
+            show_preload_progress_bar: false,
+            video: [`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh.mp4`, `https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_hv/${v_duration}_hv.mp4`],
+            images: function () {
+                var img_mat = []
+                for (k = 0; k < 8; k++) {
+                    img_mat.push(`https://karenyu717.github.io/rm_static/stimuli1/masks/${k}_mask.jpg`);
+                };
+
+                for (k = 2; k < 7; k++) {
+                    var t_backwardFrame = padding(k * 60 * v_groupRatio - v_grabFrame);
+                    var t_forwardFrame = padding(k * 60 * v_groupRatio + v_grabFrame);
+
+                    img_mat.push(`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${t_backwardFrame}.jpg`);
+                    img_mat.push(`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${t_forwardFrame}.jpg`);
+                    img_mat.push(`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_hv/${v_duration}_hv${t_backwardFrame}.jpg`);
+                    img_mat.push(`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_hv/${v_duration}_hv${t_forwardFrame}.jpg`);
+                };
+                var t_prac_trueFrame1 = padding(6 * 60 * v_groupRatio);
+                var t_prac_trueFrame2 = padding(2 * 60 * v_groupRatio);
+                var t_prac_trueFrame3 = padding(4 * 60 * v_groupRatio);
+
+                img_mat.push(`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_hv/${v_duration}_hv${t_prac_trueFrame1}.jpg`);
+                img_mat.push(`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_hv/${v_duration}_hv${t_prac_trueFrame2}.jpg`);
+                img_mat.push(`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_hv/${v_duration}_hv${t_prac_trueFrame3}.jpg`);
+
+                return img_mat;
+            }
+        };
+        console.log(preload);
+
+        timeline.push({
+            type: jsPsychBrowserCheck,
+            minimum_width: 1408,
+            minimum_height: 600
+        });
+
+        // fullscreen
+        timeline.push({
+            type: jsPsychFullscreen,
+            fullscreen_mode: true,
+            message: "<p>欢迎来到我们的实验，请点击按钮进入全屏模式。</p>",
+            button_label: "继续",
+            on_finish: function () {
+                var bodyNode = document.getElementsByTagName("body");
+                for (let i = 0; i < bodyNode.length; i++) {
+                    bodyNode[i].style.cursor = "none";
+                }
+            }
+        });
+
+        /* define instructions trial */
+        var instructions = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+            <h2>图像记忆测试</h2>
+            <p style='text-align: left'>本实验的目的是测试你对动画最后一帧记忆的能力。</p>
+            <p style='text-align: left'>每个试次中都会播放一段动画，然后它会消失。当它消失时，一个掩蔽图像将出现。需要你报告最后一帧是什么样子的。</p>
+            <p style='text-align: left'>掩蔽图像消失后，将出现两个图像。其中一个是你看到的图像，如果你认为左边的图像是正确的，请按<strong>“F”</strong>键；如果你认为右边的图像是正确的，请按<strong>“J”</strong>键。</p>
+            <p style='text-align: left'><strong>你需要尝试选择与你看到的<span style='color: red'>完全匹配</span>的图像!</strong></p>
+            <p style='text-align: left'>完成本实验即表示您同意参加本研究。您的参与是自愿的，可以在任何时候选择退出。</p>
+            <p style='text-align: left; font-size:10pt'>(PS: 实验结束后，请点击提交按钮并返回“脑岛”页面完成实验。)</p>
+            <br /><br />
+            <p>按空格键继续</p>
+          `,
+            choices: ' '
+        };
+
+        var pra_ins = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+            <p>首先，你需要进行练习，以便理解实验任务。</p>
+            <p>在练习中，图像将一直停留在屏幕上，而在正式实验中，图像会消失，<strong>只能依靠记忆进行选择!</strong></p>
+            <p>只有选择了正确选项，才可以开始正式实验。</p>
+            <br /><br />
+            <p>请按空格键开始练习</p>`,
+            choices: ' '
+        };
+
+
+        var trueFrame1 = padding(6 * 60 * v_groupRatio);
+        var otherFrame1 = padding(trueFrame1 - v_grabFrame);
+        var trial_practice1 = {
+            type: jsPsychVideoKeyboardResponse,
+            stimulus: [`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh.mp4`],
+            prompt: `<div style='width: 1410px'>
+            <div style='float: left;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${otherFrame1}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>F</strong></p></div>
+            <div style='float: right;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${trueFrame1}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>J</strong></p></div>
+            </div>`,
+            stop: 6 * v_groupRatio,
+            response_allowed_while_playing: false,
+            choices: 'j',
+        };
+
+        var trial_practice_ans1 = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: [`<img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${trueFrame1}.jpg'>`],
+            prompt: `<div style='width: 1410px'>
+            <div style='float: left;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${otherFrame1}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>F</strong></p></div>
+            <div style='float: right;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${trueFrame1}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong><span style='color: red'>J</span></strong></p></div>
+            <p><span style='color: red'>选择正确！按空格键继续。</span></p>
+            </div>`,
+            choices: ' ',
+        };
+
+        var t_trueFrame2 = 2 * 60 * v_groupRatio;
+        var trueFrame2 = padding(t_trueFrame2);
+        var otherFrame2 = padding(t_trueFrame2 + v_grabFrame);
+        
+        var trial_practice2 = {
+            type: jsPsychVideoKeyboardResponse,
+            stimulus: [`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh.mp4`],
+            prompt: `<div style='width: 1410px'>
+            <div style='float: left;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${trueFrame2}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>F</strong></p></div>
+            <div style='float: right;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${otherFrame2}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>J</strong></p></div>
+            </div>`,
+            stop: 2 * v_groupRatio,
+            response_allowed_while_playing: false,
+            choices: 'f',
+        };
+        console.log(trueFrame2);
+        console.log(otherFrame2);
+
+        var trial_practice_ans2 = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: [`<img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${trueFrame2}.jpg'>`],
+            prompt: `<div style='width: 1410px'>
+            <div style='float: left;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${trueFrame2}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong><span style='color: red'>F</span></strong></p></div>
+            <div style='float: right;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${otherFrame2}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>J</strong></p></div>            
+            <p><span style='color: red'>选择正确！按空格键继续。</span></p>
+            </div>`,
+            choices: ' ',
+        };
+
+        var trueFrame3 = padding(4 * 60 * v_groupRatio);
+        var otherFrame3 = padding(trueFrame3 - v_grabFrame);
+        var trial_practice3 = {
+            type: jsPsychVideoKeyboardResponse,
+            stimulus: [`https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh.mp4`],
+            prompt: `<div style='width: 1410px'>
+            <div style='float: left;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${trueFrame3}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>F</strong></p></div>
+            <div style='float: right;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${otherFrame3}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>J</strong></p></div>
+            </div>`,
+            stop: 4 * v_groupRatio,
+            response_allowed_while_playing: false,
+            choices: 'f',
+        };
+
+        var trial_practice_ans3 = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: [`<img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${trueFrame3}.jpg'>`],
+            prompt: `<div style='width: 1410px'>
+            <div style='float: left;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${trueFrame3}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong><span style='color: red'>F</span></strong></p></div>
+            <div style='float: right;'><img src='https://karenyu717.github.io/rm_static/stimuli1/${v_duration}_vh/${v_duration}_vh${otherFrame3}.jpg' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>J</strong></p></div>            
+            <p><span style='color: red'>选择正确！按空格键继续。</span></p>
+            </div>`,
+            choices: ' ',
+        };
+
+        /* define blank and test trials */
+        var test_ins = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+            <p>接下来是正式实验</p>
+            <p>请按空格键继续</p>
+            `,
+            choices: ' ',
+            on_finish: function (data) {
+                data.name = 'trial_blank';
+            }
+        };
+
+        /* define blank and test trials */
+        var trial_blank = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+            <p>按空格键开始</p>
+            <img src='https://karenyu717.github.io/rm_static/stimuli1/masks/0_mask.jpg'></img>
+            `,
+            choices: ' ',
+            on_finish: function (data) {
+                data.name = 'trial_blank';
+            }
+        };
+
+        var trial_video = {
+            type: jsPsychVideoKeyboardResponse,
+            stimulus: [jsPsych.timelineVariable('videoSrc')],
+            // ["https://karenyu717.github.io/rm_static/stimuli1/8_vh/8_vh.mp4"],
+            start: function () {
+                var t_data = jsPsych.timelineVariable('data');
+                var t_startTime = t_data.startTime;
+                return t_startTime
+            },
+            stop: function () {
+                var t_data = jsPsych.timelineVariable('data');
+                var t_stopTime = t_data.stopFrame / totalFrame * v_duration;
+                return t_stopTime
+            },
+            choices: 'NO_KEYS', //NO_KEYS
+            trial_ends_after_video: true,
+            on_finish: function (data) {
+                data.name = 'trial_video';
+            }
+        };
+
+        /* define blank and test trials */
+        var trial_mask = {
+            type: jsPsychHtmlKeyboardResponse,
+            // stimulus: `<img src='https://karenyu717.github.io/rm_static/stimuli1/masks/0_mask.jpg'></img>`,
+            stimulus: function () {
+                return `<img src='${jsPsych.timelineVariable('maskPicSrc')}'></img>`
+            },
+            choices: "NO_KEYS",
+            trial_duration: 1000,
+            on_finish: function (data) {
+                data.name = 'trial_mask';
+            }
+        };
+
+        var trial_test = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: function () {
+                return `
+            <p>请选择最后一帧的正确图像</p>
+            <div style='width: 1410px'>
+            <div style='float: left;'><img src='${jsPsych.timelineVariable('leftPicSrc')}' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>F</strong></p></div>
+            <div style='float: right;'><img src='${jsPsych.timelineVariable('rightPicSrc')}' style="overflow:hidden position:absolute"></img>
+            <p class='small'><strong>J</strong></p></div>
+            </div>
+            `},
+            choices: ['f', 'j'],
+            data: jsPsych.timelineVariable('data'),
+            on_finish: function (data) {
+                if (data.choicesPos == 'bf' && (data.response == 'f' || data.response == 'F')) {
+                    data.choicesType = 'backward';
+                }
+                else if (data.choicesPos == 'bf' && (data.response == 'j' || data.response == 'J')) {
+                    data.choicesType = 'forward';
+                }
+                else if (data.choicesPos == 'fb' && (data.response == 'f' || data.response == 'F')) {
+                    data.choicesType = 'forward';
+                }
+                else if (data.choicesPos == 'fb' && (data.response == 'j' || data.response == 'J')) {
+                    data.choicesType = 'backward';
+                }
+
+                if ((data.stopFrame < data.videoDuration * 60 / 2 && choicesType == 'forward') | (data.stopFrame > data.videoDuration * 60 / 2 && choicesType == 'backward')) {
+                    data.relationsType = 'close';
+                }
+                else if ((data.stopFrame < data.videoDuration * 60 / 2 && choicesType == 'backward') | (data.stopFrame > data.videoDuration * 60 / 2 && choicesType == 'forward')) {
+                    data.relationsType = 'far';
+                }
+                else {
+                    data.relationsType = '-';
+                }
+
+                data.name = 'trial_test';
+
+                var curr_progress_bar_value = jsPsych.getProgressBarCompleted();
+                jsPsych.setProgressBar(curr_progress_bar_value + (1 / n_trials));
+            }
+        };
+
+        /* define test procedure */
+        var test_procedure = {
+            timeline: [trial_blank, trial_video, trial_mask, trial_test],
+            timeline_variables: test_stimuli,
+        };
+
+        var end_ins = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+            <p>实验结束，按空格键继续。</p>
+          `,
+            choices: ' ',
+            on_finish: function () {
+                var bodyNode = document.getElementsByTagName("body");
+                for (let i = 0; i < bodyNode.length; i++) {
+                    bodyNode[i].style.cursor = "default";
+                }
+            }
+        };
+
+        var trial_q1 = {
+            type: jsPsychSurveyText,
+            button_label: '继续',
+            questions: [{
+                prompt: '依据猜测，你认为这项研究的目的是什么？',
+                required: true,
+                rows: 5,
+                name: 'guess'
+            }],
+            on_finish: function (data) {
+                data.response = String(data.response.guess);
+                data.name = 'trial_guess';
+            }
+        }
+
+        var trial_q2 = {
+            type: jsPsychSurveyText,
+            button_label: '提交',
+            questions: [{
+                prompt: `<p>完成实验！非常感谢你的参与！请点击下面的按钮提交，并<strong><span style='color: red'>返回“脑岛”页面</span></strong>完成实验。</P>
+                    <p>你也可以在此留下你对实验的任何建议或疑惑。（选填）</p>`,
+                placeholder: '比如，实验过程一切顺利吗？',
+                rows: 5,
+                name: 'comments'
+            }],
+            on_finish: function (data) {
+                data.response = String(data.response.comments);
+                data.name = 'trial_guess';
+            }
+        }
+
+        timeline.push(preload);
+        timeline.push(instructions);
+        timeline.push(pra_ins);
+        timeline.push(trial_practice1);
+        timeline.push(trial_practice_ans1);
+        timeline.push(trial_practice2);
+        timeline.push(trial_practice_ans2);
+        timeline.push(trial_practice3);
+        timeline.push(trial_practice_ans3);
+        timeline.push(test_ins);
+        timeline.push(test_procedure);
+        timeline.push(end_ins);
+        timeline.push(trial_q1);
+        timeline.push(trial_q2);
+
+        // exit fullscreen mode
+        timeline.push({
+            type: jsPsychFullscreen,
+            fullscreen_mode: false,
+            delay_after: 0,
+            extensions: [{ type: Naodao }]
+        });
+
+        jsPsych.run(timeline);
+
+        //function-------------------------------------------------------------------------------------------
+        function padding(num, length) {
+            for (var len = (num + "").length; len < 4; len = num.length) {
+                num = "0" + num;
+            }
+            return num;
+        }
+
+    </script>
+</body>
+
+</html>
